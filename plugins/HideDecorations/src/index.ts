@@ -2,7 +2,7 @@ import { findByStoreName } from '@vendetta/metro';
 import { after } from '@vendetta/patcher';
 
 const normalizeFonts = (text: string) => 
-    typeof text === 'string' ? text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "") : text;
+    typeof text === 'string' ? text.normalize("NFKC") : text;
 
 let patches: (() => void)[] = [];
 const proxyCache = new WeakMap();
@@ -40,7 +40,11 @@ export default {
                         // Nameplates are often non-configurable getters, Proxy bypasses this
                         nameplate: () => null,
                         // Custom name decorations (official Discord fonts and colors)
+                        clan: () => null,
                         nameDecoration: () => null,
+                        name_decoration: () => null,
+                        nameDecorationData: () => null,
+                        name_decoration_data: () => null,
                         // Global Name and Username fonts
                         globalName: (val) => normalizeFonts(val),
                         username: (val) => normalizeFonts(val),
@@ -53,7 +57,11 @@ export default {
                     if (!member) return member;
                     return createProxy(member, {
                         // Custom name decorations can also appear on guild member objects
+                        clan: () => null,
                         nameDecoration: () => null,
+                        name_decoration: () => null,
+                        nameDecorationData: () => null,
+                        name_decoration_data: () => null,
                         // Normalize fonts in server-specific nicknames
                         nick: (val) => normalizeFonts(val),
                     });
