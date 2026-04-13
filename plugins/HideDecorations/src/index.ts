@@ -15,8 +15,11 @@ export default {
 
             const userOverrides = {
                 avatarDecoration: () => null,
+                avatar_decoration: () => null,
                 avatarDecorationData: () => null,
+                avatar_decoration_data: () => null,
                 profileEffectId: () => null,
+                profile_effect_id: () => null,
                 nameplate: () => null,
                 clan: () => null,
                 nameDecoration: () => null,
@@ -25,6 +28,8 @@ export default {
                 name_decoration_id: () => null,
                 nameDecorationData: () => null,
                 name_decoration_data: () => null,
+                nameStyle: () => null,
+                name_style: () => null,
                 globalName: (val: any) => normalizeFonts(val),
                 username: (val: any) => normalizeFonts(val),
             };
@@ -53,17 +58,21 @@ export default {
             }
 
             if (GuildMemberStore) {
-                patches.push(after('getMember', GuildMemberStore, (_args, member) => {
+                const patchMember = (member: any) => {
                     if (!member) return member;
                     return createProxy(member, {
-                        ...userOverrides, // Apply same logic to member fields
+                        ...userOverrides,
                         // Crucially: if member.user is accessed, proxy that too
                         user: (val) => val ? createProxy(val, userOverrides) : val,
                         // Ensure nicknames are also cleaned
                         nick: (val) => normalizeFonts(val),
-                        clan: () => null,
                     });
-                }));
+                };
+
+                patches.push(after('getMember', GuildMemberStore, (_args, member) => patchMember(member)));
+                if (GuildMemberStore.getTrueMember) {
+                    patches.push(after('getTrueMember', GuildMemberStore, (_args, member) => patchMember(member)));
+                }
             }
         } catch (error) {
             console.error("[HideDecorations] Error:", error);
