@@ -1,91 +1,26 @@
 import { findByStoreName } from '@vendetta/metro';
-import { after } from '@vendetta/patcher';
-
+import { instead } from '@vendetta/patcher';
 let patches: (() => void)[] = [];
-const proxyCache = new WeakMap();
-
 export default {
     onLoad: () => {
         try {
+            // TEST 2: Patch UserStore.getUser
             const UserStore = findByStoreName('UserStore');
-            const GuildMemberStore = findByStoreName('GuildMemberStore');
-            const UserProfileStore = findByStoreName('UserProfileStore');
-
-            const userOverrides = {
-                avatarDecoration: () => null,
-                avatar_decoration: () => null,
-                avatarDecorationData: () => null,
-                avatar_decoration_data: () => null,
-                profileEffectId: () => null,
-                profile_effect_id: () => null,
-                nameplate: () => null,
-            };
-
-            const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
-                if (!target || typeof target !== 'object') return target;
-                if (proxyCache.has(target)) return proxyCache.get(target);
-
-                const proxy = new Proxy(target, {
-                    get(t, prop) {
-                        // Use 't' as receiver to avoid 'this' context issues on native models
-                        const val = Reflect.get(t, prop, t);
-                        if (typeof prop === 'string' && prop in overrides && val != null) {
-                            return overrides[prop](val);
+            if (UserStore?.getUser) {
+                patches.push(
+                    instead('getUser', UserStore, (args, orig) => {
+                        const user = orig(...args);
+                        if (user) {
+                            user.avatarDecoration = null;
+                            user.avatarDecorationData = null;
+                            user.nameplate = null;
                         }
-                        return val;
-                    },
-                    getOwnPropertyDescriptor(t, prop) {
-                        const desc = Reflect.getOwnPropertyDescriptor(t, prop);
-                        if (desc && typeof prop === 'string' && prop in overrides) {
-                            const val = Reflect.get(t, prop, t);
-                            if (val != null) {
-                                return {
-                                    ...desc,
-                                    value: overrides[prop](val),
-                                    get: undefined,
-                                    set: undefined,
-                                };
-                            }
-                        }
-                        return desc;
-                    },
-                    ownKeys(t) {
-                        return Reflect.ownKeys(t);
-                    },
-                });
-
-                proxyCache.set(target, proxy);
-                return proxy;
-            };
-
-            if (UserStore) {
-                patches.push(after('getUser', UserStore, (_args, user) => {
-                    return user ? createProxy(user, userOverrides) : user;
-                }));
-            }
-
-            if (UserProfileStore) {
-                patches.push(after('getUserProfile', UserProfileStore, (_args, profile) => {
-                    if (!profile) return profile;
-                    return createProxy(profile, {
-                        ...userOverrides,
-                        user: (val) => val ? createProxy(val, userOverrides) : val,
-                    });
-                }));
-            }
-
-            if (GuildMemberStore) {
-                const patchMember = (member: any) => {
-                    if (!member) return member;
-                    return createProxy(member, {
-                        ...userOverrides
-                    });
-                };
-
-                patches.push(after('getMember', GuildMemberStore, (_args, member) => patchMember(member)));
-                if (GuildMemberStore.getTrueMember) {
-                    patches.push(after('getTrueMember', GuildMemberStore, (_args, member) => patchMember(member)));
-                }
+                        return user;
+                    })
+                );
+                console.log("[HideDecorations] Test 2: UserStore.getUser patched");
+            } else {
+                console.log("[HideDecorations] Test 2: UserStore.getUser NOT found");
             }
         } catch (error) {
             console.error("[HideDecorations] Error:", error);
