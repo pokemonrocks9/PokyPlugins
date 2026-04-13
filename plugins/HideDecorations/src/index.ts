@@ -1,50 +1,25 @@
 import { findByStoreName } from '@vendetta/metro';
-import { after } from '@vendetta/patcher';
-
-const normalizeFonts = (text: string) => 
-    typeof text === 'string' ? text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "") : text;
-
+import { instead } from '@vendetta/patcher';
 let patches: (() => void)[] = [];
-
 export default {
     onLoad: () => {
         try {
+            // TEST 2: Patch UserStore.getUser
             const UserStore = findByStoreName('UserStore');
-
             if (UserStore?.getUser) {
                 patches.push(
-                    after('getUser', UserStore, (_args, user) => {
-                        if (!user) return;
-
-                        // Use defineProperty to bypass "read-only" assignment errors
-                        // which cause the 1:372 rendering crash.
-                        const hide = { get: () => null, configurable: true, enumerable: true };
-
-                        if (user.avatarDecoration !== null) Object.defineProperty(user, 'avatarDecoration', hide);
-                        if (user.avatarDecorationData !== null) Object.defineProperty(user, 'avatarDecorationData', hide);
-                        if (user.profileEffectId !== null) Object.defineProperty(user, 'profileEffectId', hide);
-                        
-                        // @ts-ignore - Nameplates are a recent addition
-                        if (user.nameplate !== null) Object.defineProperty(user, 'nameplate', hide);
-
-                        // Fix Fonts by normalizing stylized Unicode (e.g. 𝕽𝖊𝖆𝖑 -> Real)
-                        // This targets globalName (Display Name). Clan tags are in user.clan and remain untouched.
-                        if (user.globalName) {
-                            const normalized = normalizeFonts(user.globalName);
-                            if (normalized !== user.globalName) {
-                                try {
-                                    Object.defineProperty(user, 'globalName', {
-                                        get: () => normalized,
-                                        configurable: true,
-                                        enumerable: true
-                                    });
-                                } catch (e) {
-                                    // Fallback for cases where the property is non-configurable
-                                }
-                            }
+                    instead('getUser', UserStore, (args, orig) => {
+                        const user = orig(...args);
+                        if (user) {
+                            user.avatarDecoration = null;
+                            user.avatarDecorationData = null;
                         }
+                        return user;
                     })
                 );
+                console.log("[HideDecorations] Test 2: UserStore.getUser patched");
+            } else {
+                console.log("[HideDecorations] Test 2: UserStore.getUser NOT found");
             }
         } catch (error) {
             console.error("[HideDecorations] Error:", error);
