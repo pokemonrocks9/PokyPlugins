@@ -13,7 +13,23 @@ export default {
             const UserStore = findByStoreName('UserStore');
             const GuildMemberStore = findByStoreName('GuildMemberStore');
 
-            const createProxy = (target: any, overrides: Record<string, (val: any) => any>) => {
+            const userOverrides = {
+                avatarDecoration: () => null,
+                avatarDecorationData: () => null,
+                profileEffectId: () => null,
+                nameplate: () => null,
+                clan: () => null,
+                nameDecoration: () => null,
+                name_decoration: () => null,
+                nameDecorationId: () => null,
+                name_decoration_id: () => null,
+                nameDecorationData: () => null,
+                name_decoration_data: () => null,
+                globalName: (val: any) => normalizeFonts(val),
+                username: (val: any) => normalizeFonts(val),
+            };
+
+            const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
                 if (!target || typeof target !== 'object') return target;
                 if (proxyCache.has(target)) return proxyCache.get(target);
 
@@ -32,23 +48,7 @@ export default {
 
             if (UserStore) {
                 patches.push(after('getUser', UserStore, (_args, user) => {
-                    if (!user) return user;
-                    return createProxy(user, {
-                        avatarDecoration: () => null,
-                        avatarDecorationData: () => null,
-                        profileEffectId: () => null,
-                        // Nameplates are often non-configurable getters, Proxy bypasses this
-                        nameplate: () => null,
-                        // Custom name decorations (official Discord fonts and colors)
-                        clan: () => null,
-                        nameDecoration: () => null,
-                        name_decoration: () => null,
-                        nameDecorationData: () => null,
-                        name_decoration_data: () => null,
-                        // Global Name and Username fonts
-                        globalName: (val) => normalizeFonts(val),
-                        username: (val) => normalizeFonts(val),
-                    });
+                    return user ? createProxy(user, userOverrides) : user;
                 }));
             }
 
@@ -56,14 +56,12 @@ export default {
                 patches.push(after('getMember', GuildMemberStore, (_args, member) => {
                     if (!member) return member;
                     return createProxy(member, {
-                        // Custom name decorations can also appear on guild member objects
-                        clan: () => null,
-                        nameDecoration: () => null,
-                        name_decoration: () => null,
-                        nameDecorationData: () => null,
-                        name_decoration_data: () => null,
-                        // Normalize fonts in server-specific nicknames
+                        ...userOverrides, // Apply same logic to member fields
+                        // Crucially: if member.user is accessed, proxy that too
+                        user: (val) => val ? createProxy(val, userOverrides) : val,
+                        // Ensure nicknames are also cleaned
                         nick: (val) => normalizeFonts(val),
+                        clan: () => null,
                     });
                 }));
             }
