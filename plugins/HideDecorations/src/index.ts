@@ -12,6 +12,7 @@ export default {
         try {
             const UserStore = findByStoreName('UserStore');
             const GuildMemberStore = findByStoreName('GuildMemberStore');
+            const UserProfileStore = findByStoreName('UserProfileStore');
 
             const userOverrides = {
                 avatarDecoration: () => null,
@@ -28,6 +29,12 @@ export default {
                 name_decoration_id: () => null,
                 nameDecorationData: () => null,
                 name_decoration_data: () => null,
+                usernameDecoration: () => null,
+                username_decoration: () => null,
+                guildMemberDecoration: () => null,
+                guild_member_decoration: () => null,
+                decorations: () => null,
+                decoration: () => null,
                 nameStyle: () => null,
                 name_style: () => null,
                 globalName: (val: any) => normalizeFonts(val),
@@ -54,6 +61,16 @@ export default {
             if (UserStore) {
                 patches.push(after('getUser', UserStore, (_args, user) => {
                     return user ? createProxy(user, userOverrides) : user;
+                }));
+            }
+
+            if (UserProfileStore) {
+                patches.push(after('getUserProfile', UserProfileStore, (_args, profile) => {
+                    if (!profile) return profile;
+                    return createProxy(profile, {
+                        ...userOverrides,
+                        user: (val) => val ? createProxy(val, userOverrides) : val,
+                    });
                 }));
             }
 
