@@ -1,9 +1,6 @@
 import { findByStoreName } from '@vendetta/metro';
 import { after } from '@vendetta/patcher';
 
-const normalizeFonts = (text: string) => 
-    typeof text === 'string' ? text.normalize("NFKC") : text;
-
 let patches: (() => void)[] = [];
 const proxyCache = new WeakMap();
 
@@ -22,8 +19,6 @@ export default {
                 profileEffectId: () => null,
                 profile_effect_id: () => null,
                 nameplate: () => null,
-                globalName: (val: any) => normalizeFonts(val),
-                username: (val: any) => normalizeFonts(val),
             };
 
             const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
@@ -83,11 +78,7 @@ export default {
                 const patchMember = (member: any) => {
                     if (!member) return member;
                     return createProxy(member, {
-                        ...userOverrides,
-                        // Crucially: if member.user is accessed, proxy that too
-                        user: (val) => val ? createProxy(val, userOverrides) : val,
-                        // Ensure nicknames are also cleaned
-                        nick: (val) => normalizeFonts(val),
+                        ...userOverrides
                     });
                 };
 
