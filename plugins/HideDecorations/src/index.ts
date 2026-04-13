@@ -1,8 +1,8 @@
 import { findByStoreName } from '@vendetta/metro';
-import { instead } from '@vendetta/patcher';
+import { after } from '@vendetta/patcher';
 
 const normalizeFonts = (text: string) => 
-    text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    typeof text === 'string' ? text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "") : text;
 
 let patches: (() => void)[] = [];
 
@@ -13,23 +13,36 @@ export default {
 
             if (UserStore?.getUser) {
                 patches.push(
-                    instead('getUser', UserStore, (args, orig) => {
-                        const user = orig(...args);
-                        if (user) {
-                            // Hide avatar decorations and frames
-                            user.avatarDecoration = null;
-                            user.avatarDecorationData = null;
+                    after('getUser', UserStore, (_args, user) => {
+                        if (!user) return;
 
-                            // Hide profile effects (animations) and nameplates
-                            user.profileEffectId = null;
-                            // @ts-ignore - nameplate is a newer field in the Discord User object
-                            user.nameplate = null;
+                        // Use defineProperty to bypass "read-only" assignment errors
+                        // which cause the 1:372 rendering crash.
+                        const hide = { get: () => null, configurable: true, enumerable: true };
 
-                            // "Fix" fonts by normalizing stylized unicode in display names
-                            // We do not modify user.clan, so clan tags remain untouched
-                            if (user.globalName) user.globalName = normalizeFonts(user.globalName);
+                        if (user.avatarDecoration !== null) Object.defineProperty(user, 'avatarDecoration', hide);
+                        if (user.avatarDecorationData !== null) Object.defineProperty(user, 'avatarDecorationData', hide);
+                        if (user.profileEffectId !== null) Object.defineProperty(user, 'profileEffectId', hide);
+                        
+                        // @ts-ignore - Nameplates are a recent addition
+                        if (user.nameplate !== null) Object.defineProperty(user, 'nameplate', hide);
+
+                        // Fix Fonts by normalizing stylized Unicode (e.g. 𝕽𝖊𝖆𝖑 -> Real)
+                        // This targets globalName (Display Name). Clan tags are in user.clan and remain untouched.
+                        if (user.globalName) {
+                            const normalized = normalizeFonts(user.globalName);
+                            if (normalized !== user.globalName) {
+                                try {
+                                    Object.defineProperty(user, 'globalName', {
+                                        get: () => normalized,
+                                        configurable: true,
+                                        enumerable: true
+                                    });
+                                } catch (e) {
+                                    // Fallback for cases where the property is non-configurable
+                                }
+                            }
                         }
-                        return user;
                     })
                 );
             }
