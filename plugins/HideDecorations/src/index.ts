@@ -15,13 +15,15 @@ export default {
             const UserProfileStore = findByStoreName('UserProfileStore');
 
             const userOverrides = {
-                avatarDecoration: () => undefined,
-                avatar_decoration: () => undefined,
-                avatarDecorationData: () => undefined,
-                avatar_decoration_data: () => undefined,
-                profileEffectId: () => undefined,
-                profile_effect_id: () => undefined,
-                nameplate: () => undefined,
+                avatarDecoration: () => null,
+                avatar_decoration: () => null,
+                avatarDecorationData: () => null,
+                avatar_decoration_data: () => null,
+                profileEffectId: () => null,
+                profile_effect_id: () => null,
+                nameplate: () => null,
+                globalName: (val: any) => normalizeFonts(val),
+                username: (val: any) => normalizeFonts(val),
             };
 
             const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
@@ -29,13 +31,32 @@ export default {
                 if (proxyCache.has(target)) return proxyCache.get(target);
 
                 const proxy = new Proxy(target, {
-                    get(t, prop, receiver) {
-                        const val = Reflect.get(t, prop, receiver);
+                    get(t, prop) {
+                        // Use 't' as receiver to avoid 'this' context issues on native models
+                        const val = Reflect.get(t, prop, t);
                         if (typeof prop === 'string' && prop in overrides && val != null) {
                             return overrides[prop](val);
                         }
                         return val;
-                    }
+                    },
+                    getOwnPropertyDescriptor(t, prop) {
+                        const desc = Reflect.getOwnPropertyDescriptor(t, prop);
+                        if (desc && typeof prop === 'string' && prop in overrides) {
+                            const val = Reflect.get(t, prop, t);
+                            if (val != null) {
+                                return {
+                                    ...desc,
+                                    value: overrides[prop](val),
+                                    get: undefined,
+                                    set: undefined,
+                                };
+                            }
+                        }
+                        return desc;
+                    },
+                    ownKeys(t) {
+                        return Reflect.ownKeys(t);
+                    },
                 });
 
                 proxyCache.set(target, proxy);
