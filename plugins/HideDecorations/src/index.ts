@@ -13,7 +13,6 @@ export default {
                         if (user) {
                             user.avatarDecoration = null;
                             user.avatarDecorationData = null;
-                            user.nameplate = null;
                         }
                         return user;
                     })
