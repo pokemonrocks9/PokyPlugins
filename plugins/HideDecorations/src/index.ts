@@ -39,6 +39,8 @@ export default {
                         profileEffectId: () => null,
                         // Nameplates are often non-configurable getters, Proxy bypasses this
                         nameplate: () => null,
+                        // Custom name decorations (official Discord fonts and colors)
+                        nameDecoration: () => null,
                         // Global Name and Username fonts
                         globalName: (val) => normalizeFonts(val),
                         username: (val) => normalizeFonts(val),
@@ -50,6 +52,8 @@ export default {
                 patches.push(after('getMember', GuildMemberStore, (_args, member) => {
                     if (!member) return member;
                     return createProxy(member, {
+                        // Custom name decorations can also appear on guild member objects
+                        nameDecoration: () => null,
                         // Normalize fonts in server-specific nicknames
                         nick: (val) => normalizeFonts(val),
                     });
