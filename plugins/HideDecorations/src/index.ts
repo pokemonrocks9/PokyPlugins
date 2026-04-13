@@ -22,8 +22,6 @@ export default {
                 profileEffectId: () => undefined,
                 profile_effect_id: () => undefined,
                 nameplate: () => undefined,
-                globalName: (val: any) => normalizeFonts(val),
-                username: (val: any) => normalizeFonts(val),
             };
 
             const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
