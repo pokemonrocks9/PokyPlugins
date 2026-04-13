@@ -15,13 +15,13 @@ export default {
             const UserProfileStore = findByStoreName('UserProfileStore');
 
             const userOverrides = {
-                avatarDecoration: () => null,
-                avatar_decoration: () => null,
-                avatarDecorationData: () => null,
-                avatar_decoration_data: () => null,
-                profileEffectId: () => null,
-                profile_effect_id: () => null,
-                nameplate: () => null,
+                avatarDecoration: () => undefined,
+                avatar_decoration: () => undefined,
+                avatarDecorationData: () => undefined,
+                avatar_decoration_data: () => undefined,
+                profileEffectId: () => undefined,
+                profile_effect_id: () => undefined,
+                nameplate: () => undefined,
                 globalName: (val: any) => normalizeFonts(val),
                 username: (val: any) => normalizeFonts(val),
             };
@@ -32,10 +32,11 @@ export default {
 
                 const proxy = new Proxy(target, {
                     get(t, prop, receiver) {
-                        if (typeof prop === 'string' && prop in overrides) {
-                            return overrides[prop](Reflect.get(t, prop, receiver));
+                        const val = Reflect.get(t, prop, receiver);
+                        if (typeof prop === 'string' && prop in overrides && val != null) {
+                            return overrides[prop](val);
                         }
-                        return Reflect.get(t, prop, receiver);
+                        return val;
                     }
                 });
 
