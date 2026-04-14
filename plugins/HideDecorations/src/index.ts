@@ -5,7 +5,7 @@ let patches: (() => void)[] = [];
 
 /**
  * Creates a wrapper that inherits from the original object.
- * This shadows decoration properties with null without mutating the store's data.
+ * This returns a shallow copy with decoration properties set to null to avoid mutating the store's data.
  */
 const wrapAndHide = (obj: any): any => {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
@@ -17,30 +17,33 @@ const wrapAndHide = (obj: any): any => {
         'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
-    const descriptors: PropertyDescriptorMap = {};
+    // Create a shallow copy to ensure all properties are "own properties" for the RN bridge
+    const newObj = { ...obj };
 
     for (const key of shadowKeys) {
-        descriptors[key] = { value: null, configurable: true, enumerable: true, writable: true };
+        if (key in newObj) {
+            newObj[key] = null;
+        }
     }
 
     // If this is a member or profile, handle the nested user object
-    if (obj.user) {
-        descriptors.user = { value: wrapAndHide(obj.user), configurable: true, enumerable: true, writable: true };
+    if (newObj.user) {
+        newObj.user = wrapAndHide(newObj.user);
     }
 
-    if (obj.guild_member_profile) {
-        descriptors.guild_member_profile = { value: wrapAndHide(obj.guild_member_profile), configurable: true, enumerable: true, writable: true };
+    if (newObj.guild_member_profile) {
+        newObj.guild_member_profile = wrapAndHide(newObj.guild_member_profile);
     }
 
-    if (obj.guildMember) {
-        descriptors.guildMember = { value: wrapAndHide(obj.guildMember), configurable: true, enumerable: true, writable: true };
+    if (newObj.guildMember) {
+        newObj.guildMember = wrapAndHide(newObj.guildMember);
     }
 
-    if (obj.guild_member) {
-        descriptors.guild_member = { value: wrapAndHide(obj.guild_member), configurable: true, enumerable: true, writable: true };
+    if (newObj.guild_member) {
+        newObj.guild_member = wrapAndHide(newObj.guild_member);
     }
 
-    return Object.defineProperties(Object.create(obj), descriptors);
+    return newObj;
 };
 
 export default {
