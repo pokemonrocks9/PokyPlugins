@@ -15,7 +15,7 @@ const wrapAndHide = (obj: any): any => {
         'avatarDecoration', 'avatar_decoration',
         'avatarDecorationData', 'avatar_decoration_data',
         'profileEffectId', 'profile_effect_id',
-        'nameplate'
+        'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
     keysToNull.forEach(key => {
@@ -24,6 +24,8 @@ const wrapAndHide = (obj: any): any => {
 
     // If this is a member or profile, handle the nested user object
     if (obj.user) wrapper.user = wrapAndHide(obj.user);
+    if (obj.guild_member_profile) wrapper.guild_member_profile = wrapAndHide(obj.guild_member_profile);
+    if (obj.guildMember) wrapper.guildMember = wrapAndHide(obj.guildMember);
 
     return wrapper;
 };
