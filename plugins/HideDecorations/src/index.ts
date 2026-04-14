@@ -1,29 +1,31 @@
 import { findByStoreName } from '@vendetta/metro';
-import { instead } from '@vendetta/patcher';
+import { after } from '@vendetta/patcher';
 
 let patches: (() => void)[] = [];
 
-const nullify = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
+/**
+ * Creates a wrapper that inherits from the original object.
+ * This shadows decoration properties with null without mutating the store's data.
+ */
+const wrapAndHide = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
 
-    const props = [
+    const wrapper = Object.create(obj);
+    const keysToNull = [
         'avatarDecoration', 'avatar_decoration',
         'avatarDecorationData', 'avatar_decoration_data',
         'profileEffectId', 'profile_effect_id',
         'nameplate'
     ];
 
-    for (const prop of props) {
-        try {
-            // Use try-catch in case Discord freezes these objects in certain versions
-            obj[prop] = null;
-        } catch {
-            // Silently fail if property is read-only
-        }
-    }
+    keysToNull.forEach(key => {
+        wrapper[key] = null;
+    });
 
-    // Recurse if there's a nested user object (common in profiles/members)
-    if (obj.user) nullify(obj.user);
+    // If this is a member or profile, handle the nested user object
+    if (obj.user) wrapper.user = wrapAndHide(obj.user);
+
+    return wrapper;
 };
 
 export default {
@@ -34,30 +36,17 @@ export default {
             const UserProfileStore = findByStoreName('UserProfileStore');
 
             if (UserStore) {
-                patches.push(instead('getUser', UserStore, (args, orig) => {
-                    const res = orig(...args);
-                    nullify(res);
-                    return res;
-                }));
+                patches.push(after('getUser', UserStore, ([_id], res) => wrapAndHide(res)));
             }
 
             if (UserProfileStore) {
-                patches.push(instead('getUserProfile', UserProfileStore, (args, orig) => {
-                    const res = orig(...args);
-                    nullify(res);
-                    return res;
-                }));
+                patches.push(after('getUserProfile', UserProfileStore, ([_id], res) => wrapAndHide(res)));
             }
 
             if (GuildMemberStore) {
-                const patchFn = (args: any, orig: any) => {
-                    const res = orig(...args);
-                    nullify(res);
-                    return res;
-                };
-                patches.push(instead('getMember', GuildMemberStore, patchFn));
+                patches.push(after('getMember', GuildMemberStore, ([_gId, _uId], res) => wrapAndHide(res)));
                 if (GuildMemberStore.getTrueMember) {
-                    patches.push(instead('getTrueMember', GuildMemberStore, patchFn));
+                    patches.push(after('getTrueMember', GuildMemberStore, ([_gId, _uId], res) => wrapAndHide(res)));
                 }
             }
         } catch (error) {
