@@ -8,7 +8,7 @@ let patches: (() => void)[] = [];
  * This returns a shallow copy with decoration properties set to null to avoid mutating the store's data.
  */
 const wrapAndHide = (obj: any): any => {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj) || obj.__v_hidden) return obj;
 
     const shadowKeys = [
         'avatarDecoration', 'avatar_decoration',
@@ -17,8 +17,11 @@ const wrapAndHide = (obj: any): any => {
         'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
-    // Create a shallow copy to ensure all properties are "own properties" for the RN bridge
-    const newObj = { ...obj };
+    // Create a copy that preserves the prototype chain for native compatibility
+    const newObj = Object.assign(Object.create(Object.getPrototypeOf(obj)), obj);
+
+    // Mark as processed to prevent infinite loops and redundant wrapping
+    Object.defineProperty(newObj, '__v_hidden', { value: true, enumerable: false });
 
     for (const key of shadowKeys) {
         if (key in newObj) {
@@ -26,21 +29,12 @@ const wrapAndHide = (obj: any): any => {
         }
     }
 
-    // If this is a member or profile, handle the nested user object
-    if (newObj.user) {
-        newObj.user = wrapAndHide(newObj.user);
-    }
-
-    if (newObj.guild_member_profile) {
-        newObj.guild_member_profile = wrapAndHide(newObj.guild_member_profile);
-    }
-
-    if (newObj.guildMember) {
-        newObj.guildMember = wrapAndHide(newObj.guildMember);
-    }
-
-    if (newObj.guild_member) {
-        newObj.guild_member = wrapAndHide(newObj.guild_member);
+    // Recursively handle nested objects where decorations might hide
+    const nested = ['user', 'guild_member_profile', 'guildMember', 'guild_member'];
+    for (const key of nested) {
+        if (newObj[key] && typeof newObj[key] === 'object') {
+            newObj[key] = wrapAndHide(newObj[key]);
+        }
     }
 
     return newObj;
