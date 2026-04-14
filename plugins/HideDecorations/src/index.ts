@@ -19,13 +19,39 @@ const wrapAndHide = (obj: any): any => {
     ];
 
     keysToNull.forEach(key => {
-        wrapper[key] = null;
+        Object.defineProperty(wrapper, key, {
+            value: null,
+            configurable: true,
+            enumerable: true,
+            writable: true
+        });
     });
 
     // If this is a member or profile, handle the nested user object
-    if (obj.user) wrapper.user = wrapAndHide(obj.user);
-    if (obj.guild_member_profile) wrapper.guild_member_profile = wrapAndHide(obj.guild_member_profile);
-    if (obj.guildMember) wrapper.guildMember = wrapAndHide(obj.guildMember);
+    if (obj.user) {
+        Object.defineProperty(wrapper, 'user', {
+            value: wrapAndHide(obj.user),
+            configurable: true,
+            enumerable: true,
+            writable: true
+        });
+    }
+    if (obj.guild_member_profile) {
+        Object.defineProperty(wrapper, 'guild_member_profile', {
+            value: wrapAndHide(obj.guild_member_profile),
+            configurable: true,
+            enumerable: true,
+            writable: true
+        });
+    }
+    if (obj.guildMember) {
+        Object.defineProperty(wrapper, 'guildMember', {
+            value: wrapAndHide(obj.guildMember),
+            configurable: true,
+            enumerable: true,
+            writable: true
+        });
+    }
 
     return wrapper;
 };
