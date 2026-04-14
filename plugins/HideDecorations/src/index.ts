@@ -17,10 +17,10 @@ const wrapAndHide = (obj: any): any => {
         'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
-    // Get all property descriptors (including non-enumerable properties and Symbols)
+    const proto = Object.getPrototypeOf(obj);
     const descriptors = Object.getOwnPropertyDescriptors(obj);
 
-    // Shadow the decoration keys by forcing them to null in the descriptors
+    // 1. Force decoration keys to null as writable own-properties
     for (const key of shadowKeys) {
         descriptors[key] = {
             value: null,
@@ -30,25 +30,23 @@ const wrapAndHide = (obj: any): any => {
         };
     }
 
-    // Create the twin object with the same prototype and our modified descriptors
-    const newObj = Object.create(Object.getPrototypeOf(obj), descriptors);
-
-    // Mark as processed to prevent infinite loops and redundant wrapping
-    Object.defineProperty(newObj, '__v_hidden', { value: true, enumerable: false });
-
-    // Recursively handle nested objects where decorations might hide
+    // 2. Wrap nested objects inside the descriptors map before creation
     const nested = ['user', 'guild_member_profile', 'guildMember', 'guild_member'];
     for (const key of nested) {
-        const val = newObj[key];
-        if (val && typeof val === 'object') {
-            Object.defineProperty(newObj, key, {
+        const val = obj[key];
+        if (val && typeof val === 'object' && !val.__v_hidden) {
+            descriptors[key] = {
                 value: wrapAndHide(val),
                 enumerable: true,
                 configurable: true,
                 writable: true
-            });
+            };
         }
     }
+
+    // 3. Create the twin object with all overrides applied at once
+    const newObj = Object.create(proto, descriptors);
+    Object.defineProperty(newObj, '__v_hidden', { value: true, enumerable: false });
 
     return newObj;
 };
