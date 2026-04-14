@@ -8,52 +8,39 @@ let patches: (() => void)[] = [];
  * This shadows decoration properties with null without mutating the store's data.
  */
 const wrapAndHide = (obj: any): any => {
-    if (!obj || typeof obj !== 'object') return obj;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
 
-    const wrapper = Object.create(obj);
-    const keysToNull = [
+    const shadowKeys = [
         'avatarDecoration', 'avatar_decoration',
         'avatarDecorationData', 'avatar_decoration_data',
         'profileEffectId', 'profile_effect_id',
         'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
-    keysToNull.forEach(key => {
-        Object.defineProperty(wrapper, key, {
-            value: null,
-            configurable: true,
-            enumerable: true,
-            writable: true
-        });
-    });
+    const descriptors: PropertyDescriptorMap = {};
+
+    for (const key of shadowKeys) {
+        descriptors[key] = { value: null, configurable: true, enumerable: true, writable: true };
+    }
 
     // If this is a member or profile, handle the nested user object
     if (obj.user) {
-        Object.defineProperty(wrapper, 'user', {
-            value: wrapAndHide(obj.user),
-            configurable: true,
-            enumerable: true,
-            writable: true
-        });
-    }
-    if (obj.guild_member_profile) {
-        Object.defineProperty(wrapper, 'guild_member_profile', {
-            value: wrapAndHide(obj.guild_member_profile),
-            configurable: true,
-            enumerable: true,
-            writable: true
-        });
-    }
-    if (obj.guildMember) {
-        Object.defineProperty(wrapper, 'guildMember', {
-            value: wrapAndHide(obj.guildMember),
-            configurable: true,
-            enumerable: true,
-            writable: true
-        });
+        descriptors.user = { value: wrapAndHide(obj.user), configurable: true, enumerable: true, writable: true };
     }
 
-    return wrapper;
+    if (obj.guild_member_profile) {
+        descriptors.guild_member_profile = { value: wrapAndHide(obj.guild_member_profile), configurable: true, enumerable: true, writable: true };
+    }
+
+    if (obj.guildMember) {
+        descriptors.guildMember = { value: wrapAndHide(obj.guildMember), configurable: true, enumerable: true, writable: true };
+    }
+
+    if (obj.guild_member) {
+        descriptors.guild_member = { value: wrapAndHide(obj.guild_member), configurable: true, enumerable: true, writable: true };
+    }
+
+    return Object.defineProperties(Object.create(obj), descriptors);
 };
 
 export default {
