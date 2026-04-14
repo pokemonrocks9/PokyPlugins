@@ -1,8 +1,30 @@
 import { findByStoreName } from '@vendetta/metro';
-import { after } from '@vendetta/patcher';
+import { instead } from '@vendetta/patcher';
 
 let patches: (() => void)[] = [];
-const proxyCache = new WeakMap();
+
+const nullify = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+
+    const props = [
+        'avatarDecoration', 'avatar_decoration',
+        'avatarDecorationData', 'avatar_decoration_data',
+        'profileEffectId', 'profile_effect_id',
+        'nameplate'
+    ];
+
+    for (const prop of props) {
+        try {
+            // Use try-catch in case Discord freezes these objects in certain versions
+            obj[prop] = null;
+        } catch {
+            // Silently fail if property is read-only
+        }
+    }
+
+    // Recurse if there's a nested user object (common in profiles/members)
+    if (obj.user) nullify(obj.user);
+};
 
 export default {
     onLoad: () => {
@@ -11,82 +33,31 @@ export default {
             const GuildMemberStore = findByStoreName('GuildMemberStore');
             const UserProfileStore = findByStoreName('UserProfileStore');
 
-            const userOverrides = {
-                avatarDecoration: () => null,
-                avatar_decoration: () => null,
-                avatarDecorationData: () => null,
-                avatar_decoration_data: () => null,
-                profileEffectId: () => null,
-                profile_effect_id: () => null,
-                nameplate: () => null,
-            };
-
-            const createProxy = (target: any, overrides: Record<string, (val: any) => any>): any => {
-                if (!target || typeof target !== 'object') return target;
-                if (proxyCache.has(target)) return proxyCache.get(target);
-
-                const proxy = new Proxy(target, {
-                    get(t, prop) {
-                        // Use 't' as receiver to avoid 'this' context issues on native models
-                        const val = Reflect.get(t, prop, t);
-                        if (typeof prop === 'string' && prop in overrides && val != null) {
-                            return overrides[prop](val);
-                        }
-                        return val;
-                    },
-                    getOwnPropertyDescriptor(t, prop) {
-                        const desc = Reflect.getOwnPropertyDescriptor(t, prop);
-                        if (desc && typeof prop === 'string' && prop in overrides) {
-                            const val = Reflect.get(t, prop, t);
-                            if (val != null) {
-                                return {
-                                    ...desc,
-                                    value: overrides[prop](val),
-                                    get: undefined,
-                                    set: undefined,
-                                };
-                            }
-                        }
-                        return desc;
-                    },
-                    ownKeys(t) {
-                        return Reflect.ownKeys(t);
-                    },
-                });
-
-                proxyCache.set(target, proxy);
-                return proxy;
-            };
-
             if (UserStore) {
-                patches.push(after('getUser', UserStore, (_args, user) => {
-                    return user ? createProxy(user, userOverrides) : user;
+                patches.push(instead('getUser', UserStore, (args, orig) => {
+                    const res = orig(...args);
+                    nullify(res);
+                    return res;
                 }));
             }
 
             if (UserProfileStore) {
-                patches.push(after('getUserProfile', UserProfileStore, (_args, profile) => {
-                    if (!profile) return profile;
-                    return createProxy(profile, {
-                        ...userOverrides,
-                        user: (val) => val ? createProxy(val, userOverrides) : val,
-                    });
+                patches.push(instead('getUserProfile', UserProfileStore, (args, orig) => {
+                    const res = orig(...args);
+                    nullify(res);
+                    return res;
                 }));
             }
 
             if (GuildMemberStore) {
-                const patchMember = (member: any) => {
-                    if (!member) return member;
-                    return createProxy(member, {
-                        ...userOverrides,
-                        // Crucially: if member.user is accessed, proxy that too
-                        user: (val) => val ? createProxy(val, userOverrides) : val,
-                    });
+                const patchFn = (args: any, orig: any) => {
+                    const res = orig(...args);
+                    nullify(res);
+                    return res;
                 };
-
-                patches.push(after('getMember', GuildMemberStore, (_args, member) => patchMember(member)));
+                patches.push(instead('getMember', GuildMemberStore, patchFn));
                 if (GuildMemberStore.getTrueMember) {
-                    patches.push(after('getTrueMember', GuildMemberStore, (_args, member) => patchMember(member)));
+                    patches.push(instead('getTrueMember', GuildMemberStore, patchFn));
                 }
             }
         } catch (error) {
