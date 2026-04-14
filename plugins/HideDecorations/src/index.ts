@@ -17,23 +17,36 @@ const wrapAndHide = (obj: any): any => {
         'nameplate', 'nameplate_data', 'nameplateData'
     ];
 
-    // Create a copy that preserves the prototype chain for native compatibility
-    const newObj = Object.assign(Object.create(Object.getPrototypeOf(obj)), obj);
+    // Get all property descriptors (including non-enumerable properties and Symbols)
+    const descriptors = Object.getOwnPropertyDescriptors(obj);
+
+    // Shadow the decoration keys by forcing them to null in the descriptors
+    for (const key of shadowKeys) {
+        descriptors[key] = {
+            value: null,
+            enumerable: true,
+            configurable: true,
+            writable: true
+        };
+    }
+
+    // Create the twin object with the same prototype and our modified descriptors
+    const newObj = Object.create(Object.getPrototypeOf(obj), descriptors);
 
     // Mark as processed to prevent infinite loops and redundant wrapping
     Object.defineProperty(newObj, '__v_hidden', { value: true, enumerable: false });
 
-    for (const key of shadowKeys) {
-        if (key in newObj) {
-            newObj[key] = null;
-        }
-    }
-
     // Recursively handle nested objects where decorations might hide
     const nested = ['user', 'guild_member_profile', 'guildMember', 'guild_member'];
     for (const key of nested) {
-        if (newObj[key] && typeof newObj[key] === 'object') {
-            newObj[key] = wrapAndHide(newObj[key]);
+        const val = newObj[key];
+        if (val && typeof val === 'object') {
+            Object.defineProperty(newObj, key, {
+                value: wrapAndHide(val),
+                enumerable: true,
+                configurable: true,
+                writable: true
+            });
         }
     }
 
